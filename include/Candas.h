@@ -1,7 +1,7 @@
 /**
  * @file Candas.h
  * @author Haoyu Kan
- * @brief a Pandas-like Dataframe written in pure C
+ * @brief a Pandas-like Dataframe written in pure C (Header-only)
  * @version 0.1
  * @date 2022-11-18
  *
@@ -41,13 +41,13 @@ typedef struct
     void *values[MAX_COL_NUM];
 } can_dataframe;
 
+// BASIC USAGE ====================================================================================
 can_dataframe *can_alloc(int n_row, int n_col, const char cols[MAX_COL_NUM][MAX_COL_LEN], const char dtypes[MAX_COL_NUM], void *values[MAX_COL_NUM]);
 void can_free(can_dataframe *df);
 
 can_dataframe *can_read_csv(const char file[MAX_LINE_LEN], int n_col, const char cols[MAX_COL_NUM][MAX_COL_LEN], const char dtypes[MAX_COL_NUM], const char *delim, int skip_row);
 void can_write_csv(const char file[MAX_LINE_LEN], const can_dataframe *df, const char *delim);
 void can_print(const can_dataframe *df, int n_row);
-
 
 int can_get_int(const can_dataframe *df, int row, char col[MAX_COL_LEN]);
 double can_get_double(const can_dataframe *df, int row, char col[MAX_COL_LEN]);
@@ -57,12 +57,13 @@ void can_set_int(can_dataframe *df, int row, char col[MAX_COL_LEN], int value);
 void can_set_double(can_dataframe *df, int row, char col[MAX_COL_LEN], double value);
 void can_set_char(can_dataframe *df, int row, char col[MAX_COL_LEN], char value);
 
-// TODO
+// Higher Manipulation ============================================================================
 can_dataframe *can_select_col(const can_dataframe *df, char col[MAX_COL_LEN]);
 can_dataframe *can_select_cols(const can_dataframe *df, int n_col, char cols[MAX_COL_NUM][MAX_COL_LEN]);
 can_dataframe *can_select_row(const can_dataframe *df, int row);
 can_dataframe *can_select_rows(const can_dataframe *df, int n_row, int *rows);
 
+// TODO
 can_dataframe *can_filter_double(const can_dataframe *df, char col[MAX_COL_LEN], double min, double max);
 can_dataframe *can_filter_int(const can_dataframe *df, char col[MAX_COL_LEN], int min, int max);
 can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], char c);
@@ -85,7 +86,7 @@ can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2
 /// @return
 can_dataframe *can_alloc(int n_row, int n_col, const char cols[MAX_COL_NUM][MAX_COL_LEN], const char dtypes[MAX_COL_NUM], void *values[MAX_COL_NUM])
 {
-    can_dataframe *df = (can_dataframe *)malloc(sizeof(can_dataframe));
+    can_dataframe *df = (can_dataframe *)calloc(1, sizeof(can_dataframe));
     if (df == NULL)
     {
         fprintf(stderr, "ERORR: can_alloc cannot alloc memory\n");
@@ -189,7 +190,7 @@ void can_free(can_dataframe *df)
 can_dataframe *can_read_csv(const char file[MAX_LINE_LEN], int n_col, const char cols[MAX_COL_NUM][MAX_COL_LEN], const char dtypes[MAX_COL_NUM], const char *delim, int skip_row)
 {
     FILE *fp = fopen(file, "r");
-    if(!fp)
+    if (!fp)
     {
         fprintf(stderr, "can_read_csv cannot open file %s", file);
         exit(EXIT_FAILURE);
@@ -221,7 +222,7 @@ can_dataframe *can_read_csv(const char file[MAX_LINE_LEN], int n_col, const char
     {
         fgets(line, MAX_LINE_LEN, fp);
         char *pch = strtok(line, delim);
-        if(*pch == '\n') // empty line
+        if (*pch == '\n') // empty line
         {
             printf("WARNING: can_read_csv detect empty line at line %d\n", i + 1 + skip_row);
             continue;
@@ -277,8 +278,8 @@ can_dataframe *can_read_csv(const char file[MAX_LINE_LEN], int n_col, const char
 
 void can_write_csv(const char file[MAX_LINE_LEN], const can_dataframe *df, const char *delim)
 {
-    FILE* fp = fopen(file, "w");
-    if(!fp)
+    FILE *fp = fopen(file, "w");
+    if (!fp)
     {
         fprintf(stderr, "can_read_csv cannot open file %s", file);
         exit(EXIT_FAILURE);
@@ -508,6 +509,7 @@ void can_set_int(can_dataframe *df, int row, char col[MAX_COL_LEN], int value)
     if (found_col == -1)
     {
         fprintf(stderr, "ERORR: can_set_int cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
     }
     else if (df->dtypes[found_col] != 'I')
     {
@@ -547,6 +549,7 @@ void can_set_double(can_dataframe *df, int row, char col[MAX_COL_LEN], double va
     if (found_col == -1)
     {
         fprintf(stderr, "ERORR: can_set_double cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
     }
     else if (df->dtypes[found_col] != 'D')
     {
@@ -586,6 +589,7 @@ void can_set_char(can_dataframe *df, int row, char col[MAX_COL_LEN], char value)
     if (found_col == -1)
     {
         fprintf(stderr, "ERORR: can_set_char cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
     }
     else if (df->dtypes[found_col] != 'C')
     {
@@ -595,4 +599,147 @@ void can_set_char(can_dataframe *df, int row, char col[MAX_COL_LEN], char value)
     ((char *)df->values[found_col])[row] = value;
 }
 
+/// @brief select one column by name from dataframe
+/// @param df  I dataframe
+/// @param col I column name
+/// @return sub dataframe (deep copy)
+can_dataframe *can_select_col(const can_dataframe *df, char col[MAX_COL_LEN])
+{
+    int found_col = -1;
+    for (int j = 0; j < df->n_col; j++)
+    {
+        if (strcmp(col, df->cols[j]) == 0)
+        {
+            found_col = j;
+            break;
+        }
+    }
+    if (found_col == -1)
+    {
+        fprintf(stderr, "ERORR: can_select_col cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
+    }
+
+    char cols[MAX_COL_NUM][MAX_COL_LEN] = {""};
+    strncpy(cols[0], col, MAX_COL_LEN);
+    char dtypes[MAX_COL_NUM] = "";
+    dtypes[0] = df->dtypes[found_col];
+
+    void *values[MAX_COL_NUM] = {df->values[found_col]};
+    can_dataframe *res = can_alloc(df->n_row, 1, cols, dtypes, values);
+    return res;
+}
+
+/// @brief select multiple columns from a dataframe
+/// @param df    I dataframe
+/// @param n_col I number of columns selected
+/// @param cols  I column names
+/// @return sub dataframe (deep copy)
+can_dataframe *can_select_cols(const can_dataframe *df, int n_col, char cols[MAX_COL_NUM][MAX_COL_LEN])
+{
+    char dtypes[MAX_COL_NUM] = "";
+    void *values[MAX_COL_NUM] = {NULL};
+
+    for (int k = 0; k < n_col; k++)
+    {
+        char *col = cols[k];
+        int found_col = -1;
+        for (int j = 0; j < df->n_col; j++)
+        {
+            if (strcmp(col, df->cols[j]) == 0)
+            {
+                found_col = j;
+                break;
+            }
+        }
+        if (found_col == -1)
+        {
+            fprintf(stderr, "ERORR: can_select_cols cannot found col=%s\n", col);
+            exit(EXIT_FAILURE);
+        }
+        dtypes[k] = df->dtypes[found_col];
+        values[k] = df->values[found_col];
+    }
+    can_dataframe *res = can_alloc(df->n_row, n_col, cols, dtypes, values);
+    return res;
+}
+
+/// @brief select one row from dataframe
+/// @param df  I dataframe
+/// @param row I number of row
+/// @return sub dataframe (deep copy)
+can_dataframe *can_select_row(const can_dataframe *df, int row)
+{
+    if (row >= df->n_row)
+    {
+        fprintf(stderr, "ERORR: can_select_row row=%d >= df->n_row\n", row);
+        exit(EXIT_FAILURE);
+    }
+    else if (row < 0)
+    {
+        fprintf(stderr, "ERORR: can_select_row invalid row=%d < 0\n", row);
+        exit(EXIT_FAILURE);
+    }
+
+    void *values[MAX_COL_NUM] = {NULL};
+    for (int j = 0; j < df->n_col; j++)
+    {
+        values[j] = df->values[j] + row;
+    }
+
+    can_dataframe *res = can_alloc(1, df->n_col, df->cols, df->dtypes, values);
+    return res;
+}
+
+/// @brief select multiple rows (not necessarily in ascending order) from a dataframe
+/// @param df    I dataframe
+/// @param n_row I number of rows
+/// @param rows  I rows number
+/// @return sub dataframe (deep copy)
+can_dataframe *can_select_rows(const can_dataframe *df, int n_row, int *rows)
+{
+    for (int k = 0; k < n_row; k++)
+    {
+        int row = rows[k];
+        if (row >= df->n_row)
+        {
+            fprintf(stderr, "ERORR: can_select_rows row=%d >= df->n_row\n", row);
+            exit(EXIT_FAILURE);
+        }
+        else if (row < 0)
+        {
+            fprintf(stderr, "ERORR: can_select_rows invalid row=%d < 0\n", row);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // assign capacity, values here will be replaced
+    can_dataframe *res = can_alloc(n_row, df->n_col, df->cols, df->dtypes, (void **)df->values); // (void**) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+
+    // replace values
+    // for selected rows (not all rows)
+    for (int i = 0; i < n_row; i++)
+    {
+        // for all column
+        for (int j = 0; j < res->n_col; j++)
+        {
+            if (df->dtypes[j] == 'I')
+            {
+                int v = can_get_int(df, rows[i], (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                can_set_int(res, i, res->cols[j], v);
+            }
+            else if (df->dtypes[j] == 'D')
+            {
+                double v = can_get_double(df, rows[i], (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                can_set_double(res, i, res->cols[j], v);
+            }
+            else if (df->dtypes[j] == 'C')
+            {
+                char v = can_get_char(df, rows[i], (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                can_set_char(res, i, res->cols[j], v);
+            }
+        }
+    }
+    return res;
+}
 #endif
