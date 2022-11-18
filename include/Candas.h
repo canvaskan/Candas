@@ -63,11 +63,11 @@ can_dataframe *can_select_cols(const can_dataframe *df, int n_col, char cols[MAX
 can_dataframe *can_select_row(const can_dataframe *df, int row);
 can_dataframe *can_select_rows(const can_dataframe *df, int n_row, int *rows);
 
-// TODO
 can_dataframe *can_filter_double(const can_dataframe *df, char col[MAX_COL_LEN], double min, double max);
 can_dataframe *can_filter_int(const can_dataframe *df, char col[MAX_COL_LEN], int min, int max);
-can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], char c);
+can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], char min, char max);
 
+// TODO
 can_dataframe *can_concat_row(const can_dataframe *df1, const can_dataframe *df2);
 can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2);
 
@@ -742,4 +742,215 @@ can_dataframe *can_select_rows(const can_dataframe *df, int n_row, int *rows)
     }
     return res;
 }
+
+can_dataframe *can_filter_double(const can_dataframe *df, char col[MAX_COL_LEN], double min, double max)
+{
+    int found_col = -1;
+    for (int j = 0; j < df->n_col; j++)
+    {
+        if (strcmp(col, df->cols[j]) == 0)
+        {
+            found_col = j;
+            break;
+        }
+    }
+    if (found_col == -1)
+    {
+        fprintf(stderr, "ERORR: can_filter_double cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
+    }
+    else if (df->dtypes[found_col] != 'D')
+    {
+        fprintf(stderr, "ERORR: can_filter_double found col=%s but it is not double type\n", col);
+        exit(EXIT_FAILURE);
+    }
+
+    // count how many valid value
+    double *vs = (double *)df->values[found_col];
+    int n_row = 0;
+    for (int i = 0; i < df->n_row; i++)
+    {
+        if (vs[i] >= min && vs[i] <= max)
+        {
+            n_row++;
+        }
+    }
+
+    // assign capacity, values here will be replaced
+    can_dataframe *res = can_alloc(n_row, df->n_col, df->cols, df->dtypes, (void **)df->values); // (void**) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+
+    // replace values
+    // for all rows that satisfy condition
+    int row_i = 0;
+    for (int i = 0; i < df->n_row; i++)
+    {
+        // if satisfy condition
+        double compare = can_get_double(df, i, col);
+        if (compare >= min && compare <= max)
+        {
+            // for all column copy value
+            for (int j = 0; j < res->n_col; j++)
+            {
+                if (df->dtypes[j] == 'I')
+                {
+                    int v = can_get_int(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_int(res, row_i, res->cols[j], v);
+                }
+                else if (df->dtypes[j] == 'D')
+                {
+                    double v = can_get_double(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_double(res, row_i, res->cols[j], v);
+                }
+                else if (df->dtypes[j] == 'C')
+                {
+                    char v = can_get_char(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_char(res, row_i, res->cols[j], v);
+                }
+            }
+            row_i++;
+        }
+    }
+    return res;
+}
+
+can_dataframe *can_filter_int(const can_dataframe *df, char col[MAX_COL_LEN], int min, int max)
+{
+    int found_col = -1;
+    for (int j = 0; j < df->n_col; j++)
+    {
+        if (strcmp(col, df->cols[j]) == 0)
+        {
+            found_col = j;
+            break;
+        }
+    }
+    if (found_col == -1)
+    {
+        fprintf(stderr, "ERORR: can_filter_int cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
+    }
+    else if (df->dtypes[found_col] != 'I')
+    {
+        fprintf(stderr, "ERORR: can_filter_int found col=%s but it is not int type\n", col);
+        exit(EXIT_FAILURE);
+    }
+
+    // count how many valid value
+    int *vs = (int *)df->values[found_col];
+    int n_row = 0;
+    for (int i = 0; i < df->n_row; i++)
+    {
+        if (vs[i] >= min && vs[i] <= max)
+        {
+            n_row++;
+        }
+    }
+
+    // assign capacity, values here will be replaced
+    can_dataframe *res = can_alloc(n_row, df->n_col, df->cols, df->dtypes, (void **)df->values); // (void**) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+
+    // replace values
+    // for all rows that satisfy condition
+    int row_i = 0;
+    for (int i = 0; i < df->n_row; i++)
+    {
+        // if satisfy condition
+        int compare = can_get_int(df, i, col);
+        if (compare >= min && compare <= max)
+        {
+            // for all column copy value
+            for (int j = 0; j < res->n_col; j++)
+            {
+                if (df->dtypes[j] == 'I')
+                {
+                    int v = can_get_int(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_int(res, row_i, res->cols[j], v);
+                }
+                else if (df->dtypes[j] == 'D')
+                {
+                    double v = can_get_double(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_double(res, row_i, res->cols[j], v);
+                }
+                else if (df->dtypes[j] == 'C')
+                {
+                    char v = can_get_char(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_char(res, row_i, res->cols[j], v);
+                }
+            }
+            row_i++;
+        }
+    }
+    return res;
+}
+
+can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], char min, char max)
+{
+    int found_col = -1;
+    for (int j = 0; j < df->n_col; j++)
+    {
+        if (strcmp(col, df->cols[j]) == 0)
+        {
+            found_col = j;
+            break;
+        }
+    }
+    if (found_col == -1)
+    {
+        fprintf(stderr, "ERORR: can_filter_char cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
+    }
+    else if (df->dtypes[found_col] != 'C')
+    {
+        fprintf(stderr, "ERORR: can_filter_char found col=%s but it is not char type\n", col);
+        exit(EXIT_FAILURE);
+    }
+
+    // count how many valid value
+    char *vs = (char *)df->values[found_col];
+    int n_row = 0;
+    for (int i = 0; i < df->n_row; i++)
+    {
+        if (vs[i] >= min && vs[i] <= max)
+        {
+            n_row++;
+        }
+    }
+
+    // assign capacity, values here will be replaced
+    can_dataframe *res = can_alloc(n_row, df->n_col, df->cols, df->dtypes, (void **)df->values); // (void**) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+
+    // replace values
+    // for all rows that satisfy condition
+    int row_i = 0;
+    for (int i = 0; i < df->n_row; i++)
+    {
+        // if satisfy condition
+        char compare = can_get_char(df, i, col);
+        if (compare >= min && compare <= max)
+        {
+            // for all column copy value
+            for (int j = 0; j < res->n_col; j++)
+            {
+                if (df->dtypes[j] == 'I')
+                {
+                    int v = can_get_int(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_int(res, row_i, res->cols[j], v);
+                }
+                else if (df->dtypes[j] == 'D')
+                {
+                    double v = can_get_double(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_double(res, row_i, res->cols[j], v);
+                }
+                else if (df->dtypes[j] == 'C')
+                {
+                    char v = can_get_char(df, i, (char *)df->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                    can_set_char(res, row_i, res->cols[j], v);
+                }
+            }
+            row_i++;
+        }
+    }
+    return res;
+}
+
 #endif
