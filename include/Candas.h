@@ -67,10 +67,10 @@ can_dataframe *can_filter_double(const can_dataframe *df, char col[MAX_COL_LEN],
 can_dataframe *can_filter_int(const can_dataframe *df, char col[MAX_COL_LEN], int min, int max);
 can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], char min, char max);
 
-// TODO
 can_dataframe *can_concat_row(const can_dataframe *df1, const can_dataframe *df2);
 can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2);
 
+// TODO
 can_dataframe *can_merge_inner(const can_dataframe *df1, const can_dataframe *df2, char key);
 can_dataframe *can_merge_outer(const can_dataframe *df1, const can_dataframe *df2, char key);
 can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2, char key);
@@ -82,7 +82,7 @@ can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2
 /// @param n_col  I number of cols (must be exact)
 /// @param cols   I column names
 /// @param dtypes I data types, e.g. "IDDC" means 4 cols with int, double, double, char
-/// @param values I init values of columns (deep copy, only n_row), set NULL to do nothing
+/// @param values I init values of columns (deep copy, only n_row), set NULL (not {NULL}) to do only malloc
 /// @return
 can_dataframe *can_alloc(int n_row, int n_col, const char cols[MAX_COL_NUM][MAX_COL_LEN], const char dtypes[MAX_COL_NUM], void *values[MAX_COL_NUM])
 {
@@ -743,6 +743,12 @@ can_dataframe *can_select_rows(const can_dataframe *df, int n_row, int *rows)
     return res;
 }
 
+/// @brief filter rows that have value of col between min and max
+/// @param df  I dataframe
+/// @param col I col name that have double date type
+/// @param min I min value
+/// @param max I max value
+/// @return     filtered dataframe
 can_dataframe *can_filter_double(const can_dataframe *df, char col[MAX_COL_LEN], double min, double max)
 {
     int found_col = -1;
@@ -813,6 +819,12 @@ can_dataframe *can_filter_double(const can_dataframe *df, char col[MAX_COL_LEN],
     return res;
 }
 
+/// @brief filter rows that have value of col between min and max
+/// @param df  I dataframe
+/// @param col I col name that have int date type
+/// @param min I min value
+/// @param max I max value
+/// @return     filtered dataframe
 can_dataframe *can_filter_int(const can_dataframe *df, char col[MAX_COL_LEN], int min, int max)
 {
     int found_col = -1;
@@ -883,6 +895,12 @@ can_dataframe *can_filter_int(const can_dataframe *df, char col[MAX_COL_LEN], in
     return res;
 }
 
+/// @brief filter rows that have value of col between min and max
+/// @param df  I dataframe
+/// @param col I col name that have char date type
+/// @param min I min value
+/// @param max I max value
+/// @return     filtered dataframe
 can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], char min, char max)
 {
     int found_col = -1;
@@ -950,6 +968,99 @@ can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], c
             row_i++;
         }
     }
+    return res;
+}
+
+/// @brief concatenate two dataframe by row
+/// @param df1 dataframe 1
+/// @param df2 dataframe 2
+/// @return concatenated dataframe
+can_dataframe *can_concat_row(const can_dataframe *df1, const can_dataframe *df2)
+{
+    // check if have same cols
+    if (df1->n_col != df2->n_col)
+    {
+        fprintf(stderr, "ERROR: can_concat_row df1->n_col != df2->n_col\n");
+        exit(EXIT_FAILURE);
+    }
+    for (int j = 0; j < df1->n_col; j++)
+    {
+        if (strcmp(df1->cols[j], df2->cols[j]) != 0)
+        {
+            fprintf(stderr, "ERROR: can_concat_row column of df1 %s have different name with df2\n", df1->cols[j]);
+            exit(EXIT_FAILURE);
+        }
+
+        if (df1->dtypes[j] != df2->dtypes[j])
+        {
+            fprintf(stderr, "ERROR: can_concat_row column of df1 %s have different data type with df2\n", df1->cols[j]);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    can_dataframe *res = can_alloc(df1->n_row + df2->n_row, df1->n_col, df1->cols, df1->dtypes, (void **)df1->values); // (void**) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+
+    // copy value of df2
+    int row_i = df1->n_row;
+    for (int i = 0; i < df2->n_row; i++)
+    {
+        // for all column copy value
+        for (int j = 0; j < res->n_col; j++)
+        {
+            if (df2->dtypes[j] == 'I')
+            {
+                int v = can_get_int(df2, i, (char *)df2->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                can_set_int(res, row_i, res->cols[j], v);
+            }
+            else if (df2->dtypes[j] == 'D')
+            {
+                double v = can_get_double(df2, i, (char *)df2->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                can_set_double(res, row_i, res->cols[j], v);
+            }
+            else if (df2->dtypes[j] == 'C')
+            {
+                char v = can_get_char(df2, i, (char *)df2->cols[j]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                can_set_char(res, row_i, res->cols[j], v);
+            }
+        }
+        row_i++;
+    }
+
+    return res;
+}
+
+can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2)
+{
+    // check they have same row
+    if (df1->n_row != df2->n_row)
+    {
+        fprintf(stderr, "ERORR: can_concat_col df1->n_row = %d != df2->n_row = %d\n", df1->n_row, df2->n_row);
+        exit(EXIT_FAILURE);
+    }
+
+    // check if their col add up exceed MAX_COL_NUM
+    if (df1->n_col + df2->n_col > MAX_COL_NUM)
+    {
+        fprintf(stderr, "ERORR: can_concat_col df1->n_col + df2->n_col = %d > MAX_COL_NUM = %d\n", df1->n_col + df2->n_col, MAX_COL_NUM);
+        exit(EXIT_FAILURE);
+    }
+
+    char cols[MAX_COL_NUM][MAX_COL_LEN] = {""};
+    char dtypes[MAX_COL_NUM] = "";
+    void *values[MAX_COL_NUM] = {NULL};
+    for (int j = 0; j < df1->n_col; j++)
+    {
+        strncpy(cols[j], df1->cols[j], MAX_COL_LEN);
+        dtypes[j] = df1->dtypes[j];
+        values[j] = df1->values[j];
+    }
+    for (int j = df1->n_col; j < df1->n_col + df2->n_col; j++)
+    {
+        strncpy(cols[j], df2->cols[j - df1->n_col], MAX_COL_LEN);
+        dtypes[j] = df2->dtypes[j - df1->n_col];
+        values[j] = df2->values[j - df1->n_col];
+    }
+    can_dataframe *res = can_alloc(df1->n_row, df1->n_col + df2->n_col, cols, dtypes, values);
     return res;
 }
 

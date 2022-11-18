@@ -109,6 +109,25 @@ void test_filter()
     can_free(anchor_A_to_C);
 }
 
+void test_concat()
+{
+    const char cols[MAX_COL_NUM][MAX_COL_LEN] = {"ANCHOR", "N", "E", "U", "ANT1", "ANT2"};
+    can_dataframe *df1 = can_read_csv("../test_data/test1", 6, cols, "CDDDII", " ", 1);
+    can_print(df1, 4);
+
+    can_dataframe *df2 = can_read_csv("../test_data/test1", 6, cols, "CDDDII", " ", 1);
+
+    can_dataframe *df3 = can_concat_row(df1, df2);
+    can_print(df3, 8);
+
+    can_dataframe *df4 = can_concat_col(df3, df3);
+    can_print(df4, 8);
+
+    can_free(df1);
+    can_free(df2);
+    can_free(df3);
+}
+
 int main(int argc, char const *argv[])
 {
     // test_alloc_and_free();
@@ -116,5 +135,6 @@ int main(int argc, char const *argv[])
     // test_get_and_set();
     // test_select_col_and_cols();
     // test_select_row_and_rows();
-    test_filter();
+    // test_filter();
+    test_concat();
 }
