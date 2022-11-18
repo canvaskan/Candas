@@ -1,10 +1,21 @@
+/**
+ * @file Candas.h
+ * @author Haoyu Kan
+ * @brief a Pandas-like Dataframe written in pure C
+ * @version 0.1
+ * @date 2022-11-18
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
+
+
 #ifndef CANDAS_H_
 #define CANDAS_H_
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
 
 #define MAX_COL_NUM 16
 #define MAX_COL_LEN 32
@@ -34,6 +45,8 @@ can_dataframe *can_alloc(int n_row, int n_col, const char cols[MAX_COL_NUM][MAX_
 void can_free(can_dataframe *df);
 can_dataframe *can_read_csv(const char file[MAX_LINE_LEN], int n_col, const char cols[MAX_COL_NUM][MAX_COL_LEN], const char dtypes[MAX_COL_NUM], const char *delim, int skip_row);
 void can_print(const can_dataframe *df, int n_row);
+
+// TODO
 can_dataframe *can_select_col(const can_dataframe *df, char col);
 can_dataframe *can_select_row(const can_dataframe *df, int i1, int i2);
 can_dataframe *can_filter_double(const can_dataframe *df, char col, double min, double max);
@@ -44,6 +57,9 @@ can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2
 can_dataframe *can_merge_inner(const can_dataframe *df1, const can_dataframe *df2, char key);
 can_dataframe *can_merge_outer(const can_dataframe *df1, const can_dataframe *df2, char key);
 can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2, char key);
+
+
+// ================================================================================================
 
 /// @brief init and alloc memory for can_dataframe
 /// @param n_row  I number of rows (can reserve empty rows)
