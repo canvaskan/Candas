@@ -22,10 +22,10 @@
 
 #define MISS_INT -999
 #define MISS_DOUBLE -999.999
-#define MISS_CHAR '/'
+#define MISS_CHAR ' '
 
 /**
- * @brief Pandas-like DataFrame, currently only support int/double/char type
+ * @brief Pandas-like DataFrame, currently only support int/double/char (I/D/C) type
  * row | col1[int] |  col2[double] |  col3[char]
  * --------------------------------------------
  *  0  | 1         |   1.1         |   'A'
@@ -70,10 +70,12 @@ can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], c
 can_dataframe *can_concat_row(const can_dataframe *df1, const can_dataframe *df2);
 can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2);
 
+can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2, char key_col[MAX_COL_LEN]);
+
 // TODO
-can_dataframe *can_merge_inner(const can_dataframe *df1, const can_dataframe *df2, char key);
-can_dataframe *can_merge_outer(const can_dataframe *df1, const can_dataframe *df2, char key);
-can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2, char key);
+can_dataframe *can_sort(const can_dataframe *df, char key_col[MAX_COL_LEN]);
+can_dataframe *can_unique(const can_dataframe *df, char key_col[MAX_COL_LEN]);
+
 
 // ================================================================================================
 
@@ -224,7 +226,7 @@ can_dataframe *can_read_csv(const char file[MAX_LINE_LEN], int n_col, const char
         char *pch = strtok(line, delim);
         if (*pch == '\n') // empty line
         {
-            printf("WARNING: can_read_csv detect empty line at line %d\n", i + 1 + skip_row);
+            fprintf(stderr, "WARNING: can_read_csv detect empty line at line %d\n", i + 1 + skip_row);
             continue;
         }
         for (int j = 0; j < df->n_col; j++)
@@ -1061,6 +1063,195 @@ can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2
         values[j] = df2->values[j - df1->n_col];
     }
     can_dataframe *res = can_alloc(df1->n_row, df1->n_col + df2->n_col, cols, dtypes, values);
+    return res;
+}
+
+/// @brief merge two dataframe, keep left dataframe unchange,
+/// (df2's key col should be unique, if not unique, first found will be matched)
+/// (should be very careful when key col is double type because of "0.1+0.2!=0.3" problem of float numbers)
+/// @param df1  left dataframe
+/// @param df2 right dataframe
+/// @param key_col  the key column name
+/// @return merged dataframe (deep copy)
+can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2, char key_col[MAX_COL_LEN])
+{
+    // check if their col add up exceed MAX_COL_NUM (-1 because only keep left key col)
+    if (df1->n_col + df2->n_col - 1 > MAX_COL_NUM)
+    {
+        fprintf(stderr, "ERORR: can_merge_left df1->n_col + df2->n_col - 1 = %d > MAX_COL_NUM = %d\n", df1->n_col + df2->n_col, MAX_COL_NUM);
+        exit(EXIT_FAILURE);
+    }
+
+    // check they both have key col
+    int found_col1 = -1;
+    for (int j = 0; j < df1->n_col; j++)
+    {
+        if (strcmp(key_col, df1->cols[j]) == 0)
+        {
+            found_col1 = j;
+            break;
+        }
+    }
+    if (found_col1 == -1)
+    {
+        fprintf(stderr, "ERORR: can_merge_left df1 do not have key_col %s\n", key_col);
+        exit(EXIT_FAILURE);
+    }
+    int found_col2 = -1;
+    for (int j = 0; j < df2->n_col; j++)
+    {
+        if (strcmp(key_col, df2->cols[j]) == 0)
+        {
+            found_col2 = j;
+            break;
+        }
+    }
+    if (found_col2 == -1)
+    {
+        fprintf(stderr, "ERORR: can_merge_left df1 have key_col %s, but df2 do not have key_col\n", key_col);
+        exit(EXIT_FAILURE);
+    }
+
+    // check if their key col are of same type
+    if (df1->dtypes[found_col1] != df2->dtypes[found_col2])
+    {
+        fprintf(stderr, "ERORR: can_merge_left df1, df2 have same key col but different type %c, %c\n", df1->dtypes[found_col1], df2->dtypes[found_col2]);
+        exit(EXIT_FAILURE);
+    }
+
+    char cols[MAX_COL_NUM][MAX_COL_LEN] = {""};
+    char dtypes[MAX_COL_NUM] = "";
+    void *values[MAX_COL_NUM] = {NULL};
+    for (int j = 0; j < df1->n_col; j++)
+    {
+        strncpy(cols[j], df1->cols[j], MAX_COL_LEN);
+        dtypes[j] = df1->dtypes[j];
+        values[j] = df1->values[j];
+    }
+    int col_i = df1->n_col;
+    for (int j = df1->n_col; j < df1->n_col + df2->n_col; j++)
+    {
+        if (strcmp(key_col, df2->cols[j - df1->n_col]) == 0)
+        {
+            continue;
+        }
+        strncpy(cols[col_i], df2->cols[j - df1->n_col], MAX_COL_LEN);
+        dtypes[col_i] = df2->dtypes[j - df1->n_col];
+        values[col_i] = df2->values[j - df1->n_col]; // invalid values, just placeholder
+        col_i++;
+    }
+    can_dataframe *res = can_alloc(df1->n_row, df1->n_col + df2->n_col - 1, cols, dtypes, values);
+
+    // match key col and fill value
+    for (int i1 = 0; i1 < df1->n_row; i1++)
+    {
+        char key_col_dtype = df1->dtypes[found_col1];
+        if (key_col_dtype == 'I')
+        {
+            int v1 = can_get_int(df1, i1, key_col);
+            for (int i2 = 0; i2 < df2->n_row; i2++)
+            {
+                int v2 = can_get_int(df2, i2, key_col);
+                if (v1 == v2) // matched
+                {
+                    // for every col in df2 except key col (found_col2)
+                    for (int j2 = 0; j2 < df2->n_col; j2++)
+                    {
+                        if (j2 == found_col2)
+                        {
+                            continue;
+                        }
+                        if (df2->dtypes[j2] == 'I')
+                        {
+                            int v = can_get_int(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_int(res, i1, (char *)df2->cols[j2], v);
+                        }
+                        else if (df2->dtypes[j2] == 'D')
+                        {
+                            double v = can_get_double(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_double(res, i1, (char *)df2->cols[j2], v);
+                        }
+                        else if (df2->dtypes[j2] == 'C')
+                        {
+                            char v = can_get_char(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_char(res, i1, (char *)df2->cols[j2], v);
+                        }
+                    }
+                }
+            }
+        }
+
+        else if (key_col_dtype == 'D')
+        {
+            double v1 = can_get_double(df1, i1, key_col);
+            for (int i2 = 0; i2 < df2->n_row; i2++)
+            {
+                double v2 = can_get_double(df2, i2, key_col);
+                if (v1 == v2) // matched
+                {
+                    // for every col in df2 except key col (found_col2)
+                    for (int j2 = 0; j2 < df2->n_col; j2++)
+                    {
+                        if (j2 == found_col2)
+                        {
+                            continue;
+                        }
+                        if (df2->dtypes[j2] == 'I')
+                        {
+                            int v = can_get_int(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_int(res, i1, (char *)df2->cols[j2], v);
+                        }
+                        else if (df2->dtypes[j2] == 'D')
+                        {
+                            double v = can_get_double(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_double(res, i1, (char *)df2->cols[j2], v);
+                        }
+                        else if (df2->dtypes[j2] == 'C')
+                        {
+                            char v = can_get_char(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_char(res, i1, (char *)df2->cols[j2], v);
+                        }
+                    }
+                }
+            }
+        }
+
+        else if (key_col_dtype == 'C')
+        {
+            char v1 = can_get_char(df1, i1, key_col);
+            for (int i2 = 0; i2 < df2->n_row; i2++)
+            {
+                char v2 = can_get_char(df2, i2, key_col);
+                if (v1 == v2) // matched
+                {
+                    // for every col in df2 except key col (found_col2)
+                    for (int j2 = 0; j2 < df2->n_col; j2++)
+                    {
+                        if (j2 == found_col2)
+                        {
+                            continue;
+                        }
+                        if (df2->dtypes[j2] == 'I')
+                        {
+                            int v = can_get_int(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_int(res, i1, (char *)df2->cols[j2], v);
+                        }
+                        else if (df2->dtypes[j2] == 'D')
+                        {
+                            double v = can_get_double(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_double(res, i1, (char *)df2->cols[j2], v);
+                        }
+                        else if (df2->dtypes[j2] == 'C')
+                        {
+                            char v = can_get_char(df2, i2, (char *)df2->cols[j2]); // (char*) here do nothing but prevent [-Wdiscarded-qualifiers] warning
+                            can_set_char(res, i1, (char *)df2->cols[j2], v);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     return res;
 }
 

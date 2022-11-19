@@ -128,6 +128,27 @@ void test_concat()
     can_free(df3);
 }
 
+void test_merge()
+{
+    const char cols[MAX_COL_NUM][MAX_COL_LEN] = {"ANCHOR", "N", "E", "U", "ANT1", "ANT2"};
+    can_dataframe *df1 = can_read_csv("../test_data/test1", 6, cols, "CDDDII", " ", 1);
+    can_print(df1, 4);
+
+    const char cols2[MAX_COL_NUM][MAX_COL_LEN] = {"ANT1", "LENGTH"};
+    int ant1[7] = {10001, 10002, 19354, 20000, 19333, 36647, 88888};
+    double length[7] = {1.1, 1.2, 1.4, 2.0, 1.3, 3.7, 8.8};
+    void* values[MAX_COL_NUM] = {ant1, length};
+    can_dataframe *df2 = can_alloc(7, 2, cols2, "ID", values);
+    can_print(df2, 7);
+
+    can_dataframe *df3 = can_merge_left(df1, df2, "ANT1");
+    can_print(df3, 4);
+
+    can_free(df1);
+    can_free(df2);
+    can_free(df3);
+}
+
 int main(int argc, char const *argv[])
 {
     // test_alloc_and_free();
@@ -136,5 +157,6 @@ int main(int argc, char const *argv[])
     // test_select_col_and_cols();
     // test_select_row_and_rows();
     // test_filter();
-    test_concat();
+    // test_concat();
+    test_merge();
 }
