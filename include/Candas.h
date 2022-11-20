@@ -1,6 +1,6 @@
 /**
  * @file Candas.h
- * @author Haoyu Kan
+ * @author Haoyu Kan at Wuhan University
  * @brief a Pandas-like Dataframe written in pure C (Header-only)
  * @version 0.2
  * @date 2022-11-18
@@ -16,6 +16,7 @@
  * - only use C standard library
  * - currently support int/double/char data type,
  *   specified by first character 'I'/'D'/'C'
+ * - support read & write csv, filter by value, concatenate by row & col, merge(left), sort by value
  * - most functions (except get pointer) are deep copy,
  *   which means use can_free for every can_dataframe
  *
@@ -36,14 +37,6 @@
 #define MISS_DOUBLE -999.999
 #define MISS_CHAR ' '
 
-/**
- * @brief Pandas-like DataFrame, currently only support int/double/char (I/D/C) type
- * row | col1[int] |  col2[double] |  col3[char]
- * --------------------------------------------
- *  0  | 1         |   1.1         |   'A'
- *  1  | 8         |   2.4         |   'B'
- *  .  | .         |    .          |    .
- */
 typedef struct
 {
     int n_row;
