@@ -2,10 +2,22 @@
  * @file Candas.h
  * @author Haoyu Kan
  * @brief a Pandas-like Dataframe written in pure C (Header-only)
- * @version 0.1
+ * @version 0.2
  * @date 2022-11-18
  *
  * @copyright Copyright (c) 2022
+ *
+ * - only one new struct: can_dataframe
+ *  * row | col1[int] |  col2[double] |  col3[char]
+ *  --------------------------------------------
+ *     0  | 1         |   1.1         |   'A'
+ *     1  | 8         |   2.4         |   'B'
+ *     .  | .         |    .          |    .
+ * - only use C standard library
+ * - currently support int/double/char data type,
+ *   specified by first character 'I'/'D'/'C'
+ * - most functions (except get pointer) are deep copy,
+ *   which means use can_free for every can_dataframe
  *
  */
 
@@ -57,6 +69,10 @@ void can_set_int(can_dataframe *df, int row, char col[MAX_COL_LEN], int value);
 void can_set_double(can_dataframe *df, int row, char col[MAX_COL_LEN], double value);
 void can_set_char(can_dataframe *df, int row, char col[MAX_COL_LEN], char value);
 
+int *can_get_int_pointer(can_dataframe *df, char col[MAX_COL_LEN]);
+double *can_get_double_pointer(can_dataframe *df, char col[MAX_COL_LEN]);
+char *can_get_char_pointer(can_dataframe *df, char col[MAX_COL_LEN]);
+
 // Higher Manipulation ============================================================================
 can_dataframe *can_select_col(const can_dataframe *df, char col[MAX_COL_LEN]);
 can_dataframe *can_select_cols(const can_dataframe *df, int n_col, char cols[MAX_COL_NUM][MAX_COL_LEN]);
@@ -72,12 +88,12 @@ can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2
 
 can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2, char key_col[MAX_COL_LEN]);
 
-// TODO
 can_dataframe *can_sort(const can_dataframe *df, char key_col[MAX_COL_LEN]);
+
+// TODO
 can_dataframe *can_unique(const can_dataframe *df, char key_col[MAX_COL_LEN]);
 
-
-// ================================================================================================
+// BELOW IS IMPLEMENTATION ========================================================================
 
 /// @brief init and alloc memory for can_dataframe
 /// @param n_row  I number of rows (can reserve empty rows)
@@ -601,6 +617,93 @@ void can_set_char(can_dataframe *df, int row, char col[MAX_COL_LEN], char value)
     ((char *)df->values[found_col])[row] = value;
 }
 
+/// @brief return the pointer to df's col of integer type
+/// @param df  I dataframe
+/// @param col I column name
+/// @return integer pointer (shallow copy)
+int *can_get_int_pointer(can_dataframe *df, char col[MAX_COL_LEN])
+{
+    // check if col exist, and data type is int
+    int found_col = -1;
+    for (int j = 0; j < df->n_col; j++)
+    {
+        if (strcmp(col, df->cols[j]) == 0)
+        {
+            found_col = j;
+            break;
+        }
+    }
+    if (found_col == -1)
+    {
+        fprintf(stderr, "ERORR: can_get_int_pointer cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
+    }
+    else if (df->dtypes[found_col] != 'I')
+    {
+        fprintf(stderr, "ERORR: can_get_int_pointer found col=%s, but it is not integer type\n", col);
+        exit(EXIT_FAILURE);
+    }
+    return df->values[found_col];
+}
+
+/// @brief return the pointer to df's col of double type
+/// @param df  I dataframe
+/// @param col I column name
+/// @return double pointer (shallow copy)
+double *can_get_double_pointer(can_dataframe *df, char col[MAX_COL_LEN])
+{
+    // check if col exist, and data type is double
+    int found_col = -1;
+    for (int j = 0; j < df->n_col; j++)
+    {
+        if (strcmp(col, df->cols[j]) == 0)
+        {
+            found_col = j;
+            break;
+        }
+    }
+    if (found_col == -1)
+    {
+        fprintf(stderr, "ERORR: can_get_double_pointer cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
+    }
+    else if (df->dtypes[found_col] != 'D')
+    {
+        fprintf(stderr, "ERORR: can_get_double_pointer found col=%s, but it is not double type\n", col);
+        exit(EXIT_FAILURE);
+    }
+    return df->values[found_col];
+}
+
+/// @brief return the pointer to df's col of char type
+/// @param df  I dataframe
+/// @param col I column name
+/// @return char pointer (shallow copy)
+char *can_get_char_pointer(can_dataframe *df, char col[MAX_COL_LEN])
+{
+    // check if col exist, and data type is char
+    int found_col = -1;
+    for (int j = 0; j < df->n_col; j++)
+    {
+        if (strcmp(col, df->cols[j]) == 0)
+        {
+            found_col = j;
+            break;
+        }
+    }
+    if (found_col == -1)
+    {
+        fprintf(stderr, "ERORR: can_get_char_pointer cannot found col=%s\n", col);
+        exit(EXIT_FAILURE);
+    }
+    else if (df->dtypes[found_col] != 'C')
+    {
+        fprintf(stderr, "ERORR: can_get_char_pointer found col=%s, but it is not char type\n", col);
+        exit(EXIT_FAILURE);
+    }
+    return df->values[found_col];
+}
+
 /// @brief select one column by name from dataframe
 /// @param df  I dataframe
 /// @param col I column name
@@ -974,8 +1077,8 @@ can_dataframe *can_filter_char(const can_dataframe *df, char col[MAX_COL_LEN], c
 }
 
 /// @brief concatenate two dataframe by row
-/// @param df1 dataframe 1
-/// @param df2 dataframe 2
+/// @param df1 I dataframe 1
+/// @param df2 I dataframe 2
 /// @return concatenated dataframe
 can_dataframe *can_concat_row(const can_dataframe *df1, const can_dataframe *df2)
 {
@@ -1031,6 +1134,10 @@ can_dataframe *can_concat_row(const can_dataframe *df1, const can_dataframe *df2
     return res;
 }
 
+/// @brief concatenate two dataframe by col
+/// @param df1 I dataframe 1
+/// @param df2 I dataframe 2
+/// @return concatenated dataframe
 can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2)
 {
     // check they have same row
@@ -1069,9 +1176,9 @@ can_dataframe *can_concat_col(const can_dataframe *df1, const can_dataframe *df2
 /// @brief merge two dataframe, keep left dataframe unchange,
 /// (df2's key col should be unique, if not unique, first found will be matched)
 /// (should be very careful when key col is double type because of "0.1+0.2!=0.3" problem of float numbers)
-/// @param df1  left dataframe
-/// @param df2 right dataframe
-/// @param key_col  the key column name
+/// @param df1     I left dataframe
+/// @param df2     I right dataframe
+/// @param key_col I the key column name
 /// @return merged dataframe (deep copy)
 can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2, char key_col[MAX_COL_LEN])
 {
@@ -1252,6 +1359,206 @@ can_dataframe *can_merge_left(const can_dataframe *df1, const can_dataframe *df2
         }
     }
 
+    return res;
+}
+
+/// @brief helper function for can_sort
+/// @param a
+/// @param b
+/// @return
+static int can_compare_int(const void *a, const void *b)
+{
+    return (*(int *)a - *(int *)b);
+}
+/// @brief helper function for can_sort
+/// @param a
+/// @param b
+/// @return
+static int can_compare_double(const void *a, const void *b)
+{
+    double diff = (*(double *)a - *(double *)b);
+    if (diff == 0.0)
+    {
+        return 0;
+    }
+    else
+    {
+        return diff > 0.0 ? 1 : -1;
+    }
+}
+/// @brief helper function for can_sort
+/// @param a
+/// @param b
+/// @return
+static int can_compare_char(const void *a, const void *b)
+{
+    return (*(char *)a - *(char *)b);
+}
+
+/// @brief sort dataframe in ascending order
+/// @param df      I dataframe
+/// @param key_col I key column name
+/// @return sorted dataframe
+can_dataframe *can_sort(const can_dataframe *df, char key_col[MAX_COL_LEN])
+{
+    int found_col = -1;
+    for (int j = 0; j < df->n_col; j++)
+    {
+        if (strcmp(key_col, df->cols[j]) == 0)
+        {
+            found_col = j;
+            break;
+        }
+    }
+    if (found_col == -1)
+    {
+        fprintf(stderr, "ERROR: can_sort df do not have key col %s\n", key_col);
+        exit(EXIT_FAILURE);
+    }
+
+    // make same structure without data
+    can_dataframe *res = can_alloc(df->n_row, df->n_col, df->cols, df->dtypes, NULL);
+    // find the sorted order
+    int *order = malloc(sizeof(int) * df->n_row);
+
+    char key_col_type = df->dtypes[found_col];
+    if (key_col_type == 'I')
+    {
+        // make a copy of key col, and sort it by qsort
+        int *vp = malloc(sizeof(int) * df->n_row);
+        int order_i = 0;
+        memcpy(vp, can_get_int_pointer((can_dataframe *)df, key_col), sizeof(int) * df->n_row);
+        qsort(vp, df->n_row, sizeof(int), can_compare_int);
+
+        // use the sorted copy as reference to get sorted order
+        for (int i = 0; i < res->n_row; i++)
+        {
+            int v = vp[i];
+            // for each row in df, search equal value
+            for (int row_i = 0; row_i < df->n_row; row_i++)
+            {
+                // if multiple rows have same value on key col, make sure they won't repeat (each row can only appear once)
+                if (v == can_get_int(df, row_i, key_col))
+                {
+                    int found = 0;
+                    for (int k = 0; k < order_i; k++)
+                    {
+                        if (row_i == order[k])
+                        {
+                            found = 1;
+                            break;
+                        }
+                    }
+                    // if not in order list, add it
+                    if (found == 0)
+                    {
+                        order[order_i] = row_i;
+                        order_i++;
+                    }
+                }
+            }
+        }
+        free(vp);
+    }
+    else if (key_col_type == 'D')
+    {
+        // make a copy of key col, and sort it by qsort
+        double *vp = malloc(sizeof(double) * df->n_row);
+        int order_i = 0;
+        memcpy(vp, can_get_double_pointer((can_dataframe *)df, key_col), sizeof(double) * df->n_row);
+        qsort(vp, df->n_row, sizeof(double), can_compare_double);
+
+        // use the sorted copy as reference to get sorted order
+        for (int i = 0; i < res->n_row; i++)
+        {
+            double v = vp[i];
+            // for each row in df, search equal value
+            for (int row_i = 0; row_i < df->n_row; row_i++)
+            {
+                // if multiple rows have same value on key col, make sure they won't repeat (each row can only appear once)
+                if (v == can_get_double(df, row_i, key_col))
+                {
+                    int found = 0;
+                    for (int k = 0; k < order_i; k++)
+                    {
+                        if (row_i == order[k])
+                        {
+                            found = 1;
+                            break;
+                        }
+                    }
+                    // if not in order list, add it
+                    if (found == 0)
+                    {
+                        order[order_i] = row_i;
+                        order_i++;
+                    }
+                }
+            }
+        }
+        free(vp);
+    }
+    else if (key_col_type == 'D')
+    {
+        // make a copy of key col, and sort it by qsort
+        char *vp = malloc(sizeof(char) * df->n_row);
+        int order_i = 0;
+        memcpy(vp, can_get_char_pointer((can_dataframe *)df, key_col), sizeof(char) * df->n_row);
+        qsort(vp, df->n_row, sizeof(char), can_compare_char);
+
+        // use the sorted copy as reference to get sorted order
+        for (int i = 0; i < res->n_row; i++)
+        {
+            char v = vp[i];
+            // for each row in df, search equal value
+            for (int row_i = 0; row_i < df->n_row; row_i++)
+            {
+                // if multiple rows have same value on key col, make sure they won't repeat (each row can only appear once)
+                if (v == can_get_char(df, row_i, key_col))
+                {
+                    int found = 0;
+                    for (int k = 0; k < order_i; k++)
+                    {
+                        if (row_i == order[k])
+                        {
+                            found = 1;
+                            break;
+                        }
+                    }
+                    // if not in order list, add it
+                    if (found == 0)
+                    {
+                        order[order_i] = row_i;
+                        order_i++;
+                    }
+                }
+            }
+        }
+        free(vp);
+    }
+
+    // now set the value of res, according to the sorted order
+    for(int i = 0;i<res->n_row;i++)
+    {
+        for(int j=0;j<res->n_col;j++)
+        {
+            char col_type = res->dtypes[j];
+            if(col_type=='I')
+            {
+                can_set_int(res, i, res->cols[j], can_get_int(df, order[i], res->cols[j]));
+            }
+            else if(col_type=='D')
+            {
+                can_set_double(res, i, res->cols[j], can_get_double(df, order[i], res->cols[j]));
+            }
+            else if(col_type=='C')
+            {
+                can_set_char(res, i, res->cols[j], can_get_char(df, order[i], res->cols[j]));
+            }
+        }
+    }
+
+    free(order);
     return res;
 }
 
